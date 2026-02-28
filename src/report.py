@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 import io
+import base64
 
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文
 plt.rcParams['axes.unicode_minus'] = False
@@ -168,3 +169,105 @@ def generate_monthly_report(processed_dir='data/processed', output_dir='output')
 if __name__ == '__main__':
     for _ in generate_monthly_report():
         pass
+
+def generate_charts_base64(df_expense):
+    """从支出DataFrame生成饼图和趋势图的Base64编码字符串"""
+    import io
+    import base64
+    import matplotlib.pyplot as plt
+
+    # 确保只有支出
+    df_expense = df_expense[df_expense['income_expense'] == '支出'].copy()
+    if df_expense.empty:
+        return None, None
+
+    # 提取月份列
+    df_expense['month'] = df_expense['tx_time'].dt.to_period('M').astype(str)
+    
+    # 1. 饼图
+    fig1, ax1 = plt.subplots(figsize=(6, 6))
+    total_by_category = df_expense.groupby('category')['amount'].sum()
+    total_by_category = total_by_category[total_by_category > 0]
+    legend_labels = [f"{cat}: {val:.0f}元" for cat, val in total_by_category.items()]
+    wedges, texts, autotexts = ax1.pie(
+        total_by_category.values,
+        autopct='%1.1f%%',
+        startangle=90,
+        pctdistance=0.85
+    )
+    ax1.legend(wedges, legend_labels, title="支出类别", loc='center left', bbox_to_anchor=(1, 0, 0.5, 1))
+    ax1.set_title('各类别支出占比（含金额）')
+    plt.tight_layout()
+    
+    img_pie = io.BytesIO()
+    plt.savefig(img_pie, format='png', dpi=100, bbox_inches='tight')
+    plt.close(fig1)
+    img_pie.seek(0)
+    pie_base64 = base64.b64encode(img_pie.getvalue()).decode('utf-8')
+
+    # 2. 趋势图（折线图）
+    trend = df_expense.groupby('month')['amount'].sum()
+    fig2, ax2 = plt.subplots(figsize=(8, 4))
+    trend.plot(kind='line', marker='o', ax=ax2)
+    ax2.set_xlabel('月份')
+    ax2.set_ylabel('支出金额(元)')
+    ax2.set_title('月度总支出趋势')
+    ax2.grid(True)
+    plt.tight_layout()
+    
+    img_trend = io.BytesIO()
+    plt.savefig(img_trend, format='png', dpi=100, bbox_inches='tight')
+    plt.close(fig2)
+    img_trend.seek(0)
+    trend_base64 = base64.b64encode(img_trend.getvalue()).decode('utf-8')
+
+    return pie_base64, trend_base64
+
+
+def plot_pie_chart(df_expense):
+    """生成饼图，返回base64编码的图片字符串"""
+    total_by_category = df_expense.groupby('category')['amount'].sum()
+    total_by_category = total_by_category[total_by_category > 0]  # 过滤掉金额为0的类别
+    
+    fig, ax = plt.subplots(figsize=(6, 6))
+    wedges, texts, autotexts = ax.pie(
+        total_by_category.values,
+        autopct='%1.1f%%',
+        startangle=90,
+        pctdistance=0.85
+    )
+    legend_labels = [f"{cat}: {val:.0f}元" for cat, val in total_by_category.items()]
+    ax.legend(wedges, legend_labels, title="支出类别", loc='center left', bbox_to_anchor=(1, 0, 0.5, 1))
+    ax.set_title('各类别支出占比（含金额）')
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    return img_base64
+
+def plot_trend_chart(df_expense):
+    """生成月度趋势折线图，返回base64编码的图片字符串"""
+    # 提取月份和总支出
+    trend = df_expense.groupby(df_expense['tx_time'].dt.to_period('M'))['amount'].sum()
+    months = trend.index.astype(str).tolist()
+    amounts = trend.values.tolist()
+    
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(months, amounts, marker='o', linewidth=2, markersize=8)
+    ax.set_xlabel('月份')
+    ax.set_ylabel('支出金额(元)')
+    ax.set_title('月度总支出趋势')
+    ax.grid(True, linestyle='--', alpha=0.7)
+    
+    # 在点上标注数值
+    for i, v in enumerate(amounts):
+        ax.text(i, v + max(amounts)*0.02, f'{v:.0f}', ha='center', va='bottom')
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    return img_base64

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}分析完成 - 财务小助手{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-success text-center">
+            <h4>✅ 分析完成！</h4>
+            <p>你的账单已成功处理，下面是消费图表预览。</p>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">📊 支出类别占比</div>
+            <div class="card-body text-center">
+                <img src="data:image/png;base64,{{ pie_chart }}" class="img-fluid" alt="饼图">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">📈 月度支出趋势</div>
+            <div class="card-body text-center">
+                <img src="data:image/png;base64,{{ trend_chart }}" class="img-fluid" alt="趋势图">
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-12 text-center">
+        <a href="/download/{{ report_file }}" class="btn btn-primary btn-lg">📥 下载详细报表 (Excel)</a>
+        <a href="/" class="btn btn-secondary btn-lg">↺ 上传另一份账单</a>
+    </div>
+</div>
+{% endblock %}

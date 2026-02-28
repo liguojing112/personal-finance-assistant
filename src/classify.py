@@ -6,8 +6,15 @@ import json
 import pandas as pd
 from pathlib import Path
 
-def load_rules(rules_path='config/category_rules.json'):
-    """加载分类规则"""
+def load_rules(rules_path=None):
+    """加载分类规则，支持相对路径或绝对路径"""
+    if rules_path is None:
+        # 获取当前文件（classify.py）所在目录的父目录（项目根目录）
+        base_dir = Path(__file__).parent.parent
+        rules_path = base_dir / 'config' / 'category_rules.json'
+    else:
+        rules_path = Path(rules_path)
+    
     with open(rules_path, 'r', encoding='utf-8') as f:
         rules = json.load(f)
     return rules
@@ -27,20 +34,19 @@ def classify_transaction(row, rules):
                 return category
     return '其他'
 
-def add_category_column(df, rules_path='config/category_rules.json'):
+def add_category_column(df, rules_path=None):
     """为DataFrame添加category列"""
     rules = load_rules(rules_path)
     df['category'] = df.apply(lambda row: classify_transaction(row, rules), axis=1)
     return df
 
-def classify_all(processed_dir='data/processed', rules_path='config/category_rules.json'):
+def classify_all(processed_dir='data/processed', rules_path=None):
     """为processed下所有清洗过的文件添加分类，并覆盖保存"""
     processed_path = Path(processed_dir)
     for parquet_file in processed_path.glob('*_cleaned.parquet'):
         print(f"正在分类: {parquet_file}")
         df = pd.read_parquet(parquet_file)
-        df = add_category_column(df, rules_path)
-        # 保存回原文件（或可另存为带类别的文件）
+        df = add_category_column(df, rules_path)   # rules_path 为 None，自动定位根目录
         df.to_parquet(parquet_file, index=False)
         print(f"分类完成，已更新: {parquet_file}")
 

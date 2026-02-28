@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}历史账单 - 财务小助手{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">📋 历史账单查询</h3>
+            </div>
+            <div class="card-body">
+                <!-- 筛选表单 -->
+                <form method="get" class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label for="start" class="form-label">开始日期</label>
+                        <input type="date" class="form-control" id="start" name="start" value="{{ start or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end" class="form-label">结束日期</label>
+                        <input type="date" class="form-control" id="end" name="end" value="{{ end or '' }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">筛选</button>
+                        <a href="/history" class="btn btn-outline-secondary">清除筛选</a>
+                    </div>
+                </form>
+
+                <!-- 图表展示 -->
+                {% if pie_chart and trend_chart %}
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">📊 支出类别占比</div>
+                            <div class="card-body text-center">
+                                <img src="data:image/png;base64,{{ pie_chart }}" class="img-fluid" alt="饼图">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">📈 月度支出趋势</div>
+                            <div class="card-body text-center">
+                                <img src="data:image/png;base64,{{ trend_chart }}" class="img-fluid" alt="趋势图">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% elif transactions %}
+                <div class="alert alert-warning">所选时间段内没有支出记录，无法生成图表。</div>
+                {% endif %}
+
+                <!-- 交易明细表 -->
+                <h4 class="mt-4">📝 交易明细</h4>
+                {% if transactions %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-primary">
+                            <tr>
+                                <th>交易时间</th>
+                                <th>类型</th>
+                                <th>交易对方</th>
+                                <th>商品说明</th>
+                                <th>收/支</th>
+                                <th>金额(元)</th>
+                                <th>类别</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in transactions %}
+                            <tr>
+                                <td>{{ t.tx_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ t.tx_type }}</td>
+                                <td>{{ t.counterparty }}</td>
+                                <td>{{ t.product }}</td>
+                                <td>
+                                    <span class="badge {% if t.income_expense == '支出' %}bg-danger{% else %}bg-success{% endif %}">
+                                        {{ t.income_expense }}
+                                    </span>
+                                </td>
+                                <td class="text-end">{{ t.amount }}</td>
+                                <td>{{ t.category }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    暂无交易记录，请先 <a href="/">上传账单</a>。
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -21,9 +21,16 @@ DEFAULT_BUDGET = {
     "其他": 100
 }
 
-def load_budget(budget_path='config/budget.json'):
-    """加载预算配置"""
-    if not Path(budget_path).exists():
+def load_budget(budget_path=None):
+    """加载预算配置，支持相对路径或绝对路径"""
+    if budget_path is None:
+        # 获取当前文件（alert.py）所在目录的父目录（项目根目录）
+        base_dir = Path(__file__).parent.parent
+        budget_path = base_dir / 'config' / 'budget.json'
+    else:
+        budget_path = Path(budget_path)
+    
+    if not budget_path.exists():
         print(f"警告：预算文件 {budget_path} 不存在，将仅使用默认预算")
         return {}
     with open(budget_path, 'r', encoding='utf-8') as f:
@@ -141,7 +148,7 @@ def mark_excel_overbudget(excel_path, over_items, month):
         wb.save(excel_path)
 
 def save_overbudget_csv(over_items, month, output_dir='output'):
-    """将超支明细保存为CSV（追加模式）"""
+    """将超支明细保存为CSV（追加模式），output_dir可为相对路径或绝对路径"""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     csv_path = output_path / 'overbudget_records.csv'
@@ -159,13 +166,15 @@ def save_overbudget_csv(over_items, month, output_dir='output'):
     df_all.to_csv(csv_path, index=False, encoding='utf-8-sig')
     print(f"超支记录已保存到: {csv_path}")
 
-def alert_all(report_generator, budget_path='config/budget.json'):
+def alert_all(report_generator, budget_path=None, output_dir='output'):
     """
     整合超支检查，传入report.py的生成器
-    收集所有超支详情，保存到output/overbudget_details.csv，并在Excel中标记
+    收集所有超支详情，保存到output_dir/overbudget_details.csv，并在Excel中标记
     """
     budget = load_budget(budget_path)
     all_over_details = []  # 收集所有超支详情
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
     
     for excel_path, df_expense in report_generator:
         months = df_expense['month'].unique()
@@ -186,9 +195,7 @@ def alert_all(report_generator, budget_path='config/budget.json'):
     # 保存所有超支详情到CSV
     if all_over_details:
         df_all = pd.DataFrame(all_over_details)
-        output_dir = Path('output')
-        output_dir.mkdir(exist_ok=True)
-        details_csv = output_dir / 'overbudget_details.csv'
+        details_csv = output_path / 'overbudget_details.csv'
         df_all.to_csv(details_csv, index=False, encoding='utf-8-sig')
         print(f"详细超支记录已保存到: {details_csv}")
 

@@ -8,6 +8,8 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import matplotlib
+matplotlib.use('Agg')  # 设置非 GUI 后端，避免 Flask 多线程问题
 import matplotlib.pyplot as plt
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image

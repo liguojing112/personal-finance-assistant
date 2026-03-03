@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import json
 import math
 import pandas as pd
 from pathlib import Path
@@ -81,9 +82,19 @@ class Transaction(db.Model):
     def __repr__(self):
         return f'<Transaction {self.tx_id}>'
 
+class Report(db.Model):
+    __tablename__ = 'reports'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    filepath = db.Column(db.String(500))          # 可选，用于快速定位
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    user = db.relationship('User', backref='reports')
+
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 # ------------------------------------------------------------
 # 表单类（必须在模型之后定义，因为引用了 User 模型）
@@ -144,7 +155,7 @@ def login():
             login_user(user, remember=True)
             next_page = request.args.get('next')
             flash('登录成功', 'success')
-            return redirect(next_page) if next_page else redirect(url_for('index'))
+            return redirect(next_page) if next_page else redirect(url_for('dashboard'))
         else:
             flash('邮箱或密码错误', 'danger')
     return render_template('login.html', form=form)
@@ -279,6 +290,24 @@ def upload_file():
         
         latest_report = os.path.basename(excel_paths[0])
         
+        # 将报表文件重命名为带用户ID和时间戳，避免多用户覆盖
+        import time
+        timestamp = int(time.time())
+        old_path = os.path.join(OUTPUT_DIR, latest_report)
+        new_filename = f"user_{current_user.id}_{timestamp}_report.xlsx"
+        new_path = os.path.join(OUTPUT_DIR, new_filename)
+        os.rename(old_path, new_path)
+        latest_report = new_filename
+
+        # 存入数据库
+        report_record = Report(
+            user_id=current_user.id,
+            filename=latest_report,
+            filepath=new_path
+        )
+        db.session.add(report_record)
+        db.session.commit()
+
         df_merged['month'] = df_merged['tx_time'].dt.to_period('M').astype(str)
         months = df_merged['month'].unique()
         budget = alert.load_budget()
@@ -289,13 +318,26 @@ def upload_file():
                 alert.mark_excel_overbudget(os.path.join(OUTPUT_DIR, latest_report), over_items, month)
         
         df_expense_only = df_merged[df_merged['income_expense'] == '支出']
-        pie_chart = report.plot_pie_chart(df_expense_only)
-        trend_chart = report.plot_trend_chart(df_expense_only)
+
+        # 准备 ECharts 数据
+        pie_data = []
+        trend_data = {'months': [], 'amounts': []}
         
+        if not df_expense_only.empty:
+            # 饼图数据
+            cat_sum = df_expense_only.groupby('category')['amount'].sum()
+            for cat, val in cat_sum.items():
+                if val > 0:
+                    pie_data.append({'name': cat, 'value': round(val, 2)})
+            # 趋势图数据
+            trend = df_expense_only.groupby(df_expense_only['tx_time'].dt.to_period('M'))['amount'].sum()
+            trend_data['months'] = [str(m) for m in trend.index]
+            trend_data['amounts'] = [round(v, 2) for v in trend.values]
+
         return render_template('result.html',
                                report_file=latest_report,
-                               pie_chart=pie_chart,
-                               trend_chart=trend_chart)
+                               pie_data=pie_data,
+                               trend_data=trend_data)
     
     except Exception as e:
         import traceback
@@ -336,20 +378,187 @@ def history():
         } for t in transactions])
         
         df_expense = df[df['income_expense'] == '支出']
+        # prepare echarts data
+        pie_data = []
+        trend_data = {'months': [], 'amounts': []}
         if not df_expense.empty:
-            pie_chart = report.plot_pie_chart(df_expense)
-            trend_chart = report.plot_trend_chart(df_expense)
-        else:
-            pie_chart = trend_chart = None
+            cat_sum = df_expense.groupby('category')['amount'].sum()
+            for cat, val in cat_sum.items():
+                if val > 0:
+                    pie_data.append({'name': cat, 'value': round(val, 2)})
+            trend = df_expense.groupby(df_expense['tx_time'].dt.to_period('M'))['amount'].sum()
+            trend_data['months'] = [str(m) for m in trend.index]
+            trend_data['amounts'] = [round(v, 2) for v in trend.values]
     else:
-        pie_chart = trend_chart = None
+        pie_data = []
+        trend_data = {'months': [], 'amounts': []}
+    
+    # 计算超支累计
+    over_sum = {}
+    if transactions:
+        # 将 transactions 转换为 DataFrame 便于分组
+        df = pd.DataFrame([{
+            'tx_time': t.tx_time,
+            'amount': float(t.amount),
+            'category': t.category,
+            'income_expense': t.income_expense
+        } for t in transactions])
+        
+        df_expense = df[df['income_expense'] == '支出']
+        if not df_expense.empty:
+            # 获取预算（全局预算，可后续按用户定制）
+            budget = alert.load_budget()
+            # 按月份分组计算超支
+            df_expense['month'] = df_expense['tx_time'].dt.to_period('M').astype(str)
+            for month in df_expense['month'].unique():
+                df_month = df_expense[df_expense['month'] == month]
+                details = alert.get_overbudget_details(month, df_month, budget)
+                for d in details:
+                    cat = d['类别']
+                    over_sum[cat] = over_sum.get(cat, 0) + d['超出金额']
+    
+    # 转换为 ECharts 条形图所需格式
+    over_data = [{"name": k, "value": round(v, 2)} for k, v in over_sum.items() if v > 0]
     
     return render_template('history.html',
                            transactions=transactions,
                            start=start_date,
                            end=end_date,
-                           pie_chart=pie_chart,
-                           trend_chart=trend_chart)
+                           pie_data=pie_data,
+                           trend_data=trend_data,
+                           over_data=over_data)
+
+
+@app.route('/reports')
+@login_required
+def reports_list():
+    reports = Report.query.filter_by(user_id=current_user.id).order_by(Report.created_at.desc()).all()
+    return render_template('reports_list.html', reports=reports)
+
+
+@app.route('/download_report/<int:report_id>')
+@login_required
+def download_report(report_id):
+    report = Report.query.get_or_404(report_id)
+    if report.user_id != current_user.id:
+        flash('无权访问此文件', 'danger')
+        return redirect(url_for('reports_list'))
+    return send_file(report.filepath, as_attachment=True, download_name=report.filename)
+
+@app.route('/edit_rules', methods=['GET', 'POST'])
+@login_required
+def edit_rules():
+    # 定位到 config/category_rules.json 文件
+    rules_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', 'category_rules.json'))
+    
+    if request.method == 'POST':
+        rules_text = request.form.get('rules')
+        try:
+            # 验证 JSON 格式
+            json.loads(rules_text)
+            # 写回文件
+            with open(rules_path, 'w', encoding='utf-8') as f:
+                f.write(rules_text)
+            flash('分类规则保存成功', 'success')
+        except json.JSONDecodeError:
+            flash('JSON 格式错误，请检查', 'danger')
+        return redirect(url_for('edit_rules'))
+    else:
+        # 读取现有规则
+        with open(rules_path, 'r', encoding='utf-8') as f:
+            rules = json.load(f)
+        # 格式化为漂亮的 JSON 字符串
+        rules_text = json.dumps(rules, ensure_ascii=False, indent=4)
+        return render_template('edit_rules.html', rules_text=rules_text)
+
+@app.route('/edit_budget', methods=['GET', 'POST'])
+@login_required
+def edit_budget():
+    budget_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', 'budget.json'))
+    if request.method == 'POST':
+        budget_text = request.form.get('budget')
+        try:
+            json.loads(budget_text)
+            with open(budget_path, 'w', encoding='utf-8') as f:
+                f.write(budget_text)
+            flash('预算保存成功', 'success')
+        except json.JSONDecodeError:
+            flash('JSON 格式错误，请检查', 'danger')
+        return redirect(url_for('edit_budget'))
+    else:
+        with open(budget_path, 'r', encoding='utf-8') as f:
+            budget = json.load(f)
+        budget_text = json.dumps(budget, ensure_ascii=False, indent=4)
+        return render_template('edit_budget.html', budget_text=budget_text)
+    
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    # 获取当前用户
+    user = current_user
+    
+    # 统计信息
+    transactions = Transaction.query.filter_by(user_id=user.id).all()
+    total_expense = sum(t.amount for t in transactions if t.income_expense == '支出')
+    total_income = sum(t.amount for t in transactions if t.income_expense == '收入')
+    tx_count = len(transactions)
+    report_count = Report.query.filter_by(user_id=user.id).count()
+    
+    # 最近5笔支出
+    recent_expenses = Transaction.query.filter_by(user_id=user.id, income_expense='支出')\
+                        .order_by(Transaction.tx_time.desc()).limit(5).all()
+    
+    # 当月是否超支（需要预算）
+    from datetime import datetime
+    now = datetime.now()
+    current_month = now.strftime('%Y-%m')
+    budget = alert.load_budget()
+    month_budget = alert.get_budget_for_month(current_month, budget)
+    
+    # 当月实际支出
+    month_expense = sum(t.amount for t in transactions 
+                        if t.income_expense == '支出' 
+                        and t.tx_time.strftime('%Y-%m') == current_month)
+    
+    over_budget = None
+    if month_budget:
+        total_budget = month_budget.get('总预算', 0)
+        if total_budget and month_expense > total_budget:
+            over_budget = month_expense - total_budget
+    
+    return render_template('dashboard.html',
+                           user=user,
+                           total_expense=round(total_expense, 2),
+                           total_income=round(total_income, 2),
+                           tx_count=tx_count,
+                           report_count=report_count,
+                           recent_expenses=recent_expenses,
+                           current_month=current_month,
+                           month_expense=round(month_expense, 2),
+                           over_budget=round(over_budget, 2) if over_budget else None)
+
+@app.route('/delete_report/<int:report_id>', methods=['POST'])
+@login_required
+def delete_report(report_id):
+    report = Report.query.get_or_404(report_id)
+    # 检查权限
+    if report.user_id != current_user.id:
+        flash('无权删除此报表', 'danger')
+        return redirect(url_for('reports_list'))
+    
+    try:
+        # 删除物理文件
+        if os.path.exists(report.filepath):
+            os.remove(report.filepath)
+        # 删除数据库记录
+        db.session.delete(report)
+        db.session.commit()
+        flash('报表删除成功', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}', 'danger')
+    
+    return redirect(url_for('reports_list'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)

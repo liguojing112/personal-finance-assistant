@@ -24,10 +24,22 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">首页</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">上传账单</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('history') }}">历史查询</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('reports_list') }}">我的报表</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('edit_rules') }}">分类规则</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('edit_budget') }}">编辑预算</a>
                     </li>
                     {% if current_user.is_authenticated %}
                         <li class="nav-item">

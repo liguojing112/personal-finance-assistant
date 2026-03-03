@@ -5,32 +5,131 @@
     <div class="col-12">
         <div class="alert alert-success text-center">
             <h4>✅ 分析完成！</h4>
-            <p>你的账单已成功处理，下面是消费图表预览。</p>
+            <p>你的账单已成功处理，下面是消费图表预览（可鼠标悬停查看详情）。</p>
         </div>
     </div>
 </div>
+
+<!-- 引入 ECharts -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
 <div class="row">
     <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-header bg-info text-white">📊 支出类别占比</div>
-            <div class="card-body text-center">
-                <img src="data:image/png;base64,{{ pie_chart }}" class="img-fluid" alt="饼图">
+            <div class="card-body">
+                {% if pie_data %}
+                    <div id="pieChart" style="width: 100%; height: 400px;"></div>
+                {% else %}
+                    <p class="text-muted text-center">暂无支出数据，无法生成图表。</p>
+                {% endif %}
             </div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-header bg-info text-white">📈 月度支出趋势</div>
-            <div class="card-body text-center">
-                <img src="data:image/png;base64,{{ trend_chart }}" class="img-fluid" alt="趋势图">
+            <div class="card-body">
+                {% if trend_data.months %}
+                    <div id="trendChart" style="width: 100%; height: 400px;"></div>
+                {% else %}
+                    <p class="text-muted text-center">暂无月度支出数据，无法生成趋势图。</p>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
 <div class="row">
     <div class="col-12 text-center">
         <a href="/download/{{ report_file }}" class="btn btn-primary btn-lg">📥 下载详细报表 (Excel)</a>
         <a href="/" class="btn btn-secondary btn-lg">↺ 上传另一份账单</a>
     </div>
 </div>
+
+<script>
+    // 饼图
+    var pieChart = echarts.init(document.getElementById('pieChart'));
+    var pieOption = {
+        title: {
+            text: '支出类别占比',
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c}元 ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            formatter: function (name) {
+                // 根据名称找到对应的数据项的值
+                var data = pieOption.series[0].data;
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i].name === name) {
+                        return name + ': ' + data[i].value + '元';
+                    }
+                }
+                return name;
+            }
+        },
+        series: [
+            {
+                name: '支出类别',
+                type: 'pie',
+                radius: '50%',
+                data: {{ pie_data | tojson }},
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowOffsetX: 0,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                    }
+                }
+            }
+        ]
+    };
+    pieChart.setOption(pieOption);
+
+    // 趋势图
+    var trendChart = echarts.init(document.getElementById('trendChart'));
+    var trendOption = {
+        title: {
+            text: '月度支出趋势',
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            formatter: function(params) {
+                return params[0].name + '月<br/>支出：' + params[0].value + '元';
+            }
+        },
+        xAxis: {
+            type: 'category',
+            data: {{ trend_data.months | tojson }}
+        },
+        yAxis: {
+            type: 'value',
+            name: '金额(元)'
+        },
+        series: [
+            {
+                name: '支出',
+                type: 'line',
+                data: {{ trend_data.amounts | tojson }},
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 8,
+                lineStyle: { width: 3 }
+            }
+        ]
+    };
+    trendChart.setOption(trendOption);
+
+    // 窗口大小变化时自适应
+    window.addEventListener('resize', function() {
+        pieChart.resize();
+        trendChart.resize();
+    });
+</script>
 {% endblock %}

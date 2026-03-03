@@ -1,6 +1,6 @@
 # 个人财务小助手
 
-一个可定制、本地运行的个人财务分析工具。支持**微信和支付宝账单**，通过用户自定义分类规则自动归类支出，生成可视化报表，并提供超支提醒与多用户数据隔离。所有数据存储在本地 MySQL 数据库中，安全可控。
+一个可定制、本地运行的个人财务分析工具。支持**微信和支付宝账单**，通过用户自定义分类规则自动归类支出，生成可视化报表，并提供超支提醒、多用户数据隔离、在线规则编辑、预算设置、交互式图表等丰富功能。所有数据安全存储在本地 MySQL 数据库中，隐私无忧。
 
 ---
 
@@ -19,8 +19,7 @@
 
 ✅ **用户自定义分类**  
 - 通过 JSON 文件配置关键词，自由定义支出类别（如“居住”、“餐饮”）  
-- 大小写不敏感，支持子串匹配  
-- 未匹配的交易自动归入“其他”  
+- 大小写不敏感，支持子串匹配，未匹配的交易自动归入“其他”  
 
 ✅ **自动分类与统计**  
 - 基于规则对每笔支出打标签，输出月度汇总  
@@ -30,8 +29,9 @@
 - 生成包含明细、月度汇总、超支统计的 Excel 报表  
 - 内嵌饼图（图例含金额）、月度趋势折线图、月度柱状图、超支条形图  
 
-✅ **网页端预览图表**  
-- 上传后直接在网页上显示饼图和趋势图，无需下载  
+✅ **网页端交互式图表**  
+- 使用 ECharts 实现可交互的饼图、趋势图、超支条形图，鼠标悬停显示详情  
+- 上传后直接在网页上预览图表，无需下载  
 
 ✅ **智能超支提醒**  
 - 按月度设置预算（支持默认预算），自动检查超支  
@@ -39,26 +39,45 @@
 - 输出超支明细 CSV 文件  
 
 ✅ **多用户与数据隔离**  
-- 注册/登录功能，每个用户只能查看自己的账单数据  
+- 注册/登录功能（密码加密），每个用户只能查看自己的账单数据  
 - 数据安全存储于 MySQL 数据库  
 
+✅ **仪表盘首页**  
+- 展示用户信息、总收支、交易笔数、报表数量  
+- 当月支出概览与超支状态  
+- 最近5笔支出记录，快速导航至各功能  
+
+✅ **报表历史管理**  
+- 每个用户可查看自己生成的所有报表  
+- 支持下载和删除报表（物理文件+数据库记录）  
+
+✅ **在线规则编辑**  
+- 在网页端直接修改分类规则（`category_rules.json`），即时生效  
+- 支持 JSON 格式校验，错误提示  
+
+✅ **在线预算编辑**  
+- 在网页端直接修改月度预算（`budget.json`），格式校验  
+- 未设置的月份自动使用默认预算  
+
 ✅ **一键运行**  
-- 集成所有模块，通过 `main.py` 可完成导入、分类、报表、超支提醒全流程  
-- 网页版支持批量上传与即时预览  
+- 命令行版：`python src/main.py` 完成导入、分类、报表全流程  
+- Web 版：`python web_app/app.py` 启动本地服务，浏览器访问  
 
 ---
 
 ## 🛠️ 技术栈
 
 - **后端**：Python 3.8+，Flask 框架  
-- **数据库**：MySQL 8.0，SQLAlchemy ORM  
+- **数据库**：MySQL 8.0，SQLAlchemy ORM（含 Flask-SQLAlchemy）  
 - **数据处理**：Pandas，PyArrow（Parquet 格式）  
-- **可视化**：Matplotlib，OpenPyXL  
-- **前端**：HTML，Jinja2 模板，Bootstrap 5  
+- **可视化**：ECharts（前端交互图表），Matplotlib + OpenPyXL（Excel 报表图表）  
+- **前端**：HTML，Jinja2 模板，Bootstrap 5，ECharts JS  
 - **用户认证**：Flask-Login，Flask-Bcrypt  
 - **表单处理**：Flask-WTF，WTForms  
 - **配置文件**：JSON  
 - **版本控制**：Git  
+
+模块化设计，代码清晰易扩展，欢迎 Fork 或 PR。
 
 ---
 
@@ -66,25 +85,29 @@
 
 ```
 personal_finance/
-├── config/
-│   ├── budget.json               # 月度预算配置
-│   └── category_rules.json        # 分类规则（核心）
+├── config/                       # 配置文件
+│   ├── budget.json                # 月度预算（用户可在线编辑）
+│   └── category_rules.json        # 分类规则（用户可在线编辑）
 ├── data/
 │   ├── raw/                       # 原始账单文件（用户放置）
 │   └── processed/                  # 清洗后的中间数据（自动生成）
-├── src/
+├── src/                           # 核心处理模块
 │   ├── import_data.py             # 导入与清洗（微信/支付宝）
 │   ├── classify.py                # 基于规则的分类
-│   ├── report.py                  # 报表生成与图表绘制
+│   ├── report.py                  # 报表生成与图表绘制（Excel）
 │   ├── alert.py                   # 超支检查与标记
 │   └── main.py                    # 命令行一键运行入口
-├── web_app/                         # Web 应用目录
+├── web_app/                       # Web 应用目录
 │   ├── app.py                      # Flask 主程序
 │   ├── templates/                   # HTML 模板
-│   │   ├── base.html                # 基础模板
+│   │   ├── base.html                # 基础模板（导航栏、闪现消息）
+│   │   ├── dashboard.html           # 用户仪表盘首页
 │   │   ├── index.html               # 上传页面
-│   │   ├── result.html              # 结果页面
-│   │   ├── history.html             # 历史查询页面
+│   │   ├── result.html              # 结果页面（交互式图表）
+│   │   ├── history.html             # 历史查询页面（含超支条形图）
+│   │   ├── reports_list.html        # 我的报表列表（带删除）
+│   │   ├── edit_rules.html          # 编辑分类规则
+│   │   ├── edit_budget.html         # 编辑预算
 │   │   ├── login.html               # 登录页面
 │   │   └── register.html            # 注册页面
 │   └── static/                      # （可选）CSS/JS 文件
@@ -98,40 +121,43 @@ personal_finance/
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
+### 1. 克隆项目
 
+```bash
+git clone https://github.com/liguojing112/personal-finance-assistant.git
+cd personal-finance-assistant
 ```
+
+### 2. 安装依赖
+
+```bash
 pip install -r requirements.txt
+pip install flask-login flask-bcrypt flask-wtf email-validator  # Web 版额外依赖
 ```
 
-**额外依赖**（用于 Web 版和数据库）：
-```
-pip install flask-login flask-bcrypt flask-wtf email-validator
-```
-
-### 2. 配置 MySQL 数据库
+### 3. 配置 MySQL 数据库
 
 - 安装 MySQL 8.0，启动服务。
 - 创建数据库（在 MySQL 命令行中执行）：
-  ```
+  ```sql
   CREATE DATABASE finance_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   ```
-- 在 `web_app/app.py` 中修改数据库连接密码（第 20 行左右）：
-  ```
+- 修改 `web_app/app.py` 中的数据库连接密码（第 20 行左右）：
+  ```python
   app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:你的密码@localhost/finance_db'
   ```
 - 创建数据表（在 `web_app` 目录下运行 Python）：
-  ```
+  ```python
   from app import app, db
   with app.app_context():
       db.create_all()
   ```
 
-### 3. 配置分类规则
+### 4. 配置分类规则（可选）
 
-编辑 `config/category_rules.json`，定义你关心的类别及关键词。示例：
+编辑 `config/category_rules.json`，或登录 Web 后在“分类规则”页面在线编辑。示例：
 
-```
+```json
 {
     "居住": ["水电费", "恒星邦办", "康佳滚筒"],
     "餐饮": ["便利店", "农夫山泉", "肉夹馍", "水果"],
@@ -142,11 +168,11 @@ pip install flask-login flask-bcrypt flask-wtf email-validator
 }
 ```
 
-### 4. 配置预算（可选）
+### 5. 配置预算（可选）
 
-编辑 `config/budget.json`，按月份设置预算。未设置的月份将使用 `alert.py` 中的 `DEFAULT_BUDGET`。
+编辑 `config/budget.json`，或登录 Web 后在“编辑预算”页面在线编辑。未设置的月份将使用 `alert.py` 中的 `DEFAULT_BUDGET`。
 
-```
+```json
 {
     "2026-01": {
         "总预算": 800,
@@ -160,48 +186,35 @@ pip install flask-login flask-bcrypt flask-wtf email-validator
 }
 ```
 
-### 5. 运行 Web 应用
+### 6. 运行 Web 应用
 
-```
+```bash
 cd web_app
 python app.py
 ```
 
 访问 `http://127.0.0.1:5000`，注册账号并登录。
 
-### 6. 上传账单
+### 7. 上传账单
 
 - 从微信导出账单：我 → 服务 → 钱包 → 账单 → 下载 → 用于个人对账（Excel 格式）。
 - 从支付宝导出账单：我的 → 账单 → 开具交易流水证明 → 用于个人对账 → 发送到邮箱，下载 CSV 文件。
 - 在网页上同时选择多个文件（支持 `.xlsx` 和 `.csv`），点击“上传并分析”。
 
-### 7. 查看结果
+### 8. 查看结果
 
-- 网页上会立即显示支出占比饼图和月度趋势图。
+- 网页上会立即显示交互式饼图（图例含金额）和月度趋势图（可悬停）。
 - 点击“下载详细报表”可获取包含所有明细、汇总和超支标记的 Excel 文件。
-- 在“历史查询”页面可按日期筛选历史记录，并查看图表。
-
----
-
-## ⚙️ 自定义规则与预算
-
-### 分类规则（`category_rules.json`）
-
-- 每个类别对应一个关键词数组。
-- 关键词匹配不区分大小写，只要出现在“交易对方”、“商品”或“备注”中即归类。
-- 未被任何规则匹配的支出自动归为“其他”。
-
-### 预算设置（`budget.json`）
-
-- 键为月份（格式 `YYYY-MM`），值为包含类别预算的字典。
-- 可包含“总预算”键，用于检查整体超支。
-- 若某月份未定义，程序会自动使用 `alert.py` 中的 `DEFAULT_BUDGET`。
+- 在“历史查询”页面可按日期筛选记录，并查看各类别累计超支条形图。
+- 在“我的报表”页面可下载或删除历史生成的报表。
+- 在“分类规则”和“编辑预算”页面可随时调整配置。
 
 ---
 
 ## 📸 效果展示
 
-> （可在此处添加截图，如上传页面、结果页图表、历史查询页面等）
+> 可在此处添加截图，如仪表盘首页、上传页、结果页（交互式图表）、历史查询页（超支条形图）、我的报表页（带删除）、编辑规则页等。  
+> （用户可自行截图替换）
 
 ---
 

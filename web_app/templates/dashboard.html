@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}我的首页 - 财务小助手{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">👤 用户信息</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>用户名：</strong> {{ user.username }}</p>
+                <p><strong>邮箱：</strong> {{ user.email }}</p>
+                <p><strong>注册时间：</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">总支出</h5>
+                <p class="card-text display-6">{{ total_expense }} 元</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">总收入</h5>
+                <p class="card-text display-6">{{ total_income }} 元</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">交易笔数</h5>
+                <p class="card-text display-6">{{ tx_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-secondary">
+            <div class="card-body">
+                <h5 class="card-title">生成报表</h5>
+                <p class="card-text display-6">{{ report_count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_month %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">📅 {{ current_month }} 月支出概览</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>当月总支出：</strong> {{ month_expense }} 元</p>
+                {% if over_budget %}
+                <div class="alert alert-danger">
+                    ⚠️ 已超支 {{ over_budget }} 元！
+                </div>
+                {% else %}
+                <div class="alert alert-success">
+                    ✅ 预算内，继续保持！
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">⏱️ 最近支出记录</h3>
+            </div>
+            <div class="card-body">
+                {% if recent_expenses %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>对方</th>
+                                <th>金额(元)</th>
+                                <th>类别</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in recent_expenses %}
+                            <tr>
+                                <td>{{ t.tx_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ t.counterparty }}</td>
+                                <td class="text-danger">{{ t.amount }}</td>
+                                <td>{{ t.category }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">暂无支出记录。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 text-center">
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">📤 上传新账单</a>
+        <a href="{{ url_for('history') }}" class="btn btn-info btn-lg">📋 历史查询</a>
+        <a href="{{ url_for('reports_list') }}" class="btn btn-success btn-lg">📁 我的报表</a>
+    </div>
+</div>
+{% endblock %}

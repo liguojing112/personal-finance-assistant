@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}编辑预算 - 财务小助手{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">💰 编辑月度预算</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    按月份设置预算，格式为 JSON。未设置的月份会自动使用默认预算。
+                    <br>示例：
+                </p>
+                <pre>{
+    "2026-01": {
+        "总预算": 800,
+        "居住": 200,
+        "餐饮": 300,
+        "购物": 150,
+        "社交": 100,
+        "学习": 30,
+        "其他": 50
+    }
+}</pre>
+                <form method="post">
+                    <div class="mb-3">
+                        <textarea class="form-control font-monospace" name="rules" rows="20">{{ rules_text }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">保存预算</button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">取消</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
